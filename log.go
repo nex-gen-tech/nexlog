@@ -2,67 +2,15 @@ package nexlog
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/gookit/color"
 )
 
-// Create a Custom GoLang Logger package called `nexlog` that implements the `Logger` interface. The `nexlog` package should have the following features, SOLID principles and all the best practices of GoLang:
-
-// 1) It should have a plugable LogFormatter interface that can be used to format the log output. You have to create two basic formatters: `JSONFormatter` and `TextFormatter`. The `TextFormatter` should be the default formatter.
-// 2) It should have a plugable LogWriter interface that can be used to write the log output. You have to create two basic writers: `FileWriter` and `StdoutWriter`. The `StdoutWriter` should be the default writer.
-// 3) It should have a plugable LogLevel interface that can be used to set the log level. You have to create three basic log levels: `INF`, `DBG` and `ERR`. The `INF` should be the default log level.
-// 4) It should have a plugable LogFilter interface that can be used to filter the log output. You have to create two basic filters: `NoFilter` and `LevelFilter`. The `NoFilter` should be the default filter.
-// 5) it should also have the hooking feature that can be used to hook the log output to a third party service. There should a LogHook interface and a AddHook function which should be used to add a hook to the logger. You have to create two basic hooks: `SlackHook` and `EmailHook`. The `SlackHook` should be the default hook.
-// 6) It should have a `NewLogger` function that can be used to create a new logger instance. The `NewLogger` function should take the following arguments:
-//     - `logLevel`: The log level to be used by the logger. The default value should be `INFO`.
-//     - `logFormatter`: The log formatter to be used by the logger. The default value should be `TextFormatter`.
-//     - `logWriter`: The log writer to be used by the logger. The default value should be `StdoutWriter`.
-//     - `logFilter`: The log filter to be used by the logger. The default value should be `NoFilter`.
-//     - `logHook`: The log hook to be used by the logger. The default value should be `SlackHook`.
-// 7) It should have the following methods:
-//     - `Debug`: This method should be used to log the debug messages.
-//     - `Info`: This method should be used to log the info messages.
-//     - `Error`: This method should be used to log the error messages.
-//     - `SetLogLevel`: This method should be used to set the log level.
-//     - `SetLogFormatter`: This method should be used to set the log formatter.
-//     - `SetLogWriter`: This method should be used to set the log writer.
-//     - `SetLogFilter`: This method should be used to set the log filter.
-//     - `SetLogHook`: This method should be used to set the log hook.
-//     - `AddHook`: This method should be used to add a hook to the logger.
-// 8) It should have the following constants:
-//     - `DBG`
-//     - `INF`
-//     - `ERR`
-//     - `WRN`
-//     - `FTL`
-// 9) It should have the following variables:
-//     - `logLevel`
-//     - `logFormatter`
-//     - `logWriter`
-//     - `logFilter`
-//     - `logHook`
-// 10) It should use the following packages:
-// - log - https://golang.org/pkg/log/
-// - color - github.com/fatih/color - for colorizing the log output based on the log level
-//  - pool - sync.Pool
-//  - json - encoding/json
-// - time - time
-// - os - os
-// - io - io
-// - bytes - bytes
-// - fmt - fmt
-// - errors - errors
-// - strings - strings
-// - reflect - reflect
-// - sync - sync
-// - net/smtp - net/smtp
-// - github.com/slack-go/slack - github.com/slack-go/slack
-// - github.com/getsentry/sentry-go - github.com/getsentry/sentry-go
-// - github.com/lestrrat-go/file-rotatelogs - github.com/lestrrat-go/file-rotatelogs
-// - github.com/mattn/go-colorable - github.com/mattn/go-colorable
-// - github.com/mattn/go-isatty - github.com/mattn/go-isatty
-
+// Level - Level type is a Enum for log levels
 type Level int
 
 const (
@@ -91,6 +39,24 @@ func (l Level) String() string {
 	}
 }
 
+// Color - Color function
+func (l Level) Color() string {
+	switch l {
+	case DBG:
+		return color.BgYellow.Render(fmt.Sprintf(" %s ", l.String()))
+	case INF:
+		return color.BgHiGreen.Render(fmt.Sprintf(" %s ", l.String()))
+	case ERR:
+		return color.BgRed.Render(fmt.Sprintf(" %s ", l.String()))
+	case WRN:
+		return color.BgCyan.Render(fmt.Sprintf(" %s ", l.String()))
+	case FTL:
+		return color.BgHiRed.Render(fmt.Sprintf(" %s ", l.String()))
+	default:
+		return color.BgHiGreen.Render(fmt.Sprintf(" %s ", l.String()))
+	}
+}
+
 type Logger interface {
 	Debug(args ...any)
 	DebugF(format string, args ...any)
@@ -100,12 +66,14 @@ type Logger interface {
 	WarnF(format string, args ...any)
 	Error(args ...any)
 	ErrorF(format string, args ...any)
+	Fatal(args ...any)
+	FatalF(format string, args ...any)
 	Log(logLevel Level, args ...any)
 	LogF(logLevel Level, format string, args ...any)
-	// SetLogLevel(logLevel Level)
-	// SetLogFormatter(logFormatter LogFormatter)
-	// SetLogFilter(logFilter LogFilter)
-	// AddHook(logHook LogHook)
+	SetLogLevel(logLevel Level)
+	SetLogFormatter(logFormatter LogFormatter)
+	SetLogFilter(logFilter LogFilter)
+	AddHook(logHook LogHook)
 }
 
 // logger - logger struct
@@ -113,7 +81,7 @@ type logger struct {
 	LogLevel     Level
 	LogFormatter LogFormatter
 	LogFilter    LogFilter
-	LogHook      []LogHook
+	LogHooks     []LogHook
 	Ident        string
 	EntryPool    sync.Pool
 }
@@ -124,7 +92,7 @@ func NewLogger(ident string) Logger {
 		LogLevel:     INF,
 		LogFormatter: NewDefaultTextFormatter(),
 		LogFilter:    NewDefaultNoFilter(),
-		LogHook:      []LogHook{NewDefaultSlackHook()},
+		LogHooks:     []LogHook{NewDefaultJsonFileLogHook()},
 		Ident:        ident,
 	}
 }
@@ -193,15 +161,7 @@ func (l *logger) ErrorF(format string, args ...any) {
 	l.LogF(ERR, format, args...)
 }
 
-// getCaller - will return the caller
-// func getCaller() *runtime.Frame {
-// 	pc := make([]uintptr, 10)
-// 	runtime.Callers(4, pc)
-// 	frames := runtime.CallersFrames(pc)
-// 	frame, _ := frames.Next()
-// 	return &frame
-// }
-
+// getCaller - getCaller function returns the caller of the function
 func getCaller() *runtime.Frame {
 	var frame *runtime.Frame
 	pc := make([]uintptr, 15)
@@ -222,19 +182,38 @@ func getCaller() *runtime.Frame {
 		frame = &f
 		break
 	}
+
 	return frame
 }
 
-// func getPackageName(f string) string {
-// 	for {
-// 		lastPeriod := strings.LastIndex(f, ".")
-// 		lastSlash := strings.LastIndex(f, "/")
-// 		if lastPeriod > lastSlash {
-// 			f = f[:lastPeriod]
-// 		} else {
-// 			break
-// 		}
-// 	}
+// SetLogLevel - SetLogLevel function sets the log level
+func (l *logger) SetLogLevel(logLevel Level) {
+	l.LogLevel = logLevel
+}
 
-// 	return f
-// }
+// SetLogFormatter - SetLogFormatter function sets the log formatter
+func (l *logger) SetLogFormatter(logFormatter LogFormatter) {
+	l.LogFormatter = logFormatter
+}
+
+// SetLogFilter - SetLogFilter function  sets the log filter
+func (l *logger) SetLogFilter(logFilter LogFilter) {
+	l.LogFilter = logFilter
+}
+
+// AddHook - AddHook function adds a log hook to the logger
+func (l *logger) AddHook(logHook LogHook) {
+	l.LogHooks = append(l.LogHooks, logHook)
+}
+
+// Fatal - Fatal function
+func (l *logger) Fatal(args ...any) {
+	l.Log(FTL, args...)
+	os.Exit(1)
+}
+
+// FatalF - FatalF function
+func (l *logger) FatalF(format string, args ...any) {
+	l.LogF(FTL, format, args...)
+	os.Exit(1)
+}

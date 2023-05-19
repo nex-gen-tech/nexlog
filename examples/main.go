@@ -1,9 +1,9 @@
 package main
 
-import "github.com/nexg/nexlog"
+import "github.com/nex-gen-tech/nexlog"
 
 func main() {
-	logger := nexlog.NewLogger("Nex")
+	logger := nexlog.NewLogger("NEXLOG")
 
 	logger.Log(nexlog.INF, "Hello World")
 	logger.LogF(nexlog.INF, "Hello %s", "World")

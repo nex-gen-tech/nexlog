@@ -4,24 +4,26 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"time"
 )
 
-// LogEntry - LogEntry struct
+// LogEntry is a structure that holds the details of a log entry.
 type LogEntry struct {
-	logger     *logger
-	logLevel   Level
-	logTime    time.Time
-	logMessage string
-	logData    map[string]any
-	caller     *runtime.Frame
-	timeStamp  time.Time
-	context    context.Context
-	buffer     *bytes.Buffer
+	logger     *logger         // Reference to the logger creating this entry
+	logLevel   Level           // Level of the log
+	logTime    time.Time       // Time of the log
+	rowMessage string          // The raw log message
+	logMessage string          // Formatted log message
+	logData    map[string]any  // Additional data to be logged
+	caller     *runtime.Frame  // Runtime information about the caller function
+	timeStamp  time.Time       // Timestamp of the log
+	context    context.Context // Context of the log
+	buffer     *bytes.Buffer   // Buffer to hold log message data
 }
 
-// NewEntry - NewEntry function
+// NewEntry creates a new LogEntry with given logger, logLevel and arguments.
 func NewEntry(logger *logger, logLevel Level, args ...any) *LogEntry {
 	logEntry := &LogEntry{
 		logger:    logger,
@@ -36,82 +38,97 @@ func NewEntry(logger *logger, logLevel Level, args ...any) *LogEntry {
 	return logEntry
 }
 
-// Log - Log function prints the log message
+// Log logs the provided arguments at the given logLevel.
 func (le *LogEntry) Log(logLevel Level, args ...any) {
 	le.log(logLevel, args...)
 }
 
-// LogF - LogF function prints the log message with the given format
+// LogF logs the provided arguments at the given logLevel, formatting them as specified.
 func (le *LogEntry) LogF(logLevel Level, format string, args ...any) {
 	le.log(logLevel, fmt.Sprintf(format, args...))
 }
 
-// log - log function is the utility function to print the log message in Log Function
+// log is a helper function that logs the provided arguments at the given logLevel.
 func (le *LogEntry) log(logLevel Level, args ...any) {
-	if le.logger.LogFilter.Filter(logLevel, args...) {
-		// Add the args to the logMessage as a string
+	if le.logger.LogFilter.Filter(logLevel, args...) || le.logger.LogLevel <= logLevel {
 		le.logMessage = fmt.Sprint(args...)
+		le.rowMessage = fmt.Sprint(args...)
 		le.logLevel = logLevel
-		// Add the log data
 		le.logMessage = le.logger.LogFormatter.Format(le)
 
 		fmt.Println(le.logMessage)
+
+		for _, hook := range le.logger.LogHooks {
+			hook.Fire(le)
+		}
 	}
 }
 
-// Info - Info function prints the log message with INFO level
+// Info logs the provided arguments at the INFO log level.
 func (le *LogEntry) Info(args ...any) {
 	le.Log(INF, args...)
 }
 
-// InfoF - InfoF function prints the log message with INFO level and the given format
+// InfoF logs the provided arguments at the INFO log level, formatting them as specified.
 func (le *LogEntry) InfoF(format string, args ...any) {
 	le.LogF(INF, format, args...)
 }
 
-// Debug - Debug function prints the log message with DEBUG level
+// Debug logs the provided arguments at the DEBUG log level.
 func (le *LogEntry) Debug(args ...any) {
 	le.Log(DBG, args...)
 }
 
-// DebugF - DebugF function prints the log message with DEBUG level and the given format
+// DebugF logs the provided arguments at the DEBUG log level, formatting them as specified.
 func (le *LogEntry) DebugF(format string, args ...any) {
 	le.LogF(DBG, format, args...)
 }
 
-// Warn - Warn function prints the log message with WARN level
+// Warn logs the provided arguments at the WARN log level.
 func (le *LogEntry) Warn(args ...any) {
 	le.Log(WRN, args...)
 }
 
-// WarnF - WarnF function prints the log message with WARN level and the given format
+// WarnF logs the provided arguments at the WARN log level, formatting them as specified.
 func (le *LogEntry) WarnF(format string, args ...any) {
 	le.LogF(WRN, format, args...)
 }
 
-// Error - Error function prints the log message with ERROR level
+// Error logs the provided arguments at the ERROR log level.
 func (le *LogEntry) Error(args ...any) {
 	le.Log(ERR, args...)
 }
 
-// ErrorF - ErrorF function prints the log message with ERROR level and the given format
+// ErrorF logs the provided arguments at the ERROR log level, formatting them as specified.
 func (le *LogEntry) ErrorF(format string, args ...any) {
 	le.LogF(ERR, format, args...)
 }
 
-// WithContext - WithContext function
+// Fatal logs the provided arguments at the FATAL log level. Terminates the program after logging.
+func (le *LogEntry) Fatal(args ...any) {
+	le.Log(FTL, args...)
+	os.Exit(1)
+}
+
+// FatalF logs the provided arguments at the FATAL log level, formatting them as specified. Terminates the program after logging.
+func (le *LogEntry) FatalF(format string, args ...any) {
+	le.LogF(FTL, format, args...)
+	os.Exit(1)
+}
+
+// WithContext adds a context to the log entry and returns the updated LogEntry.
 func (le *LogEntry) WithContext(ctx context.Context) *LogEntry {
 	le.context = ctx
 	return le
 }
 
-// WithField - WithField function
+// WithField adds a key-value pair to the log entry and returns the updated LogEntry.
 func (le *LogEntry) WithField(key string, value any) *LogEntry {
 	le.logData[key] = value
 	return le
 }
 
-// WithFields - WithFields function
+// WithFields adds multiple key-value pairs to the log entry and returns the updated LogEntry.
 func (le *LogEntry) WithFields(data map[string]any) *LogEntry {
 	for key, value := range data {
 		le.logData[key] = value
@@ -120,13 +137,13 @@ func (le *LogEntry) WithFields(data map[string]any) *LogEntry {
 	return le
 }
 
-// WithTime - WithTime function
+// WithTime sets the log time to the provided time and returns the updated LogEntry.
 func (le *LogEntry) WithTime(t time.Time) *LogEntry {
 	le.logTime = t
 	return le
 }
 
-// With Identifier - WithIdentifier function
+// WithIdentifier sets the logger's identifier to the provided string and returns the updated LogEntry.
 func (le *LogEntry) WithIdentifier(identifier string) *LogEntry {
 	le.logger.Ident = identifier
 	return le

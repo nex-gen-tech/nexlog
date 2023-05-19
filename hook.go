@@ -1,18 +1,59 @@
 package nexlog
 
-// LogHook interface
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+// LogHook is an interface that encapsulates actions to be taken after a log entry is created.
 type LogHook interface {
-	AddHook(logLevel Level, args ...any) error
+	Fire(le *LogEntry) error
 }
 
-type DefaultSlackHook struct{}
+// defaultJsonFileLogHook is an implementation of LogHook that writes log entries to a JSON file.
+type defaultJsonFileLogHook struct{}
 
-// NewDefaultSlackHook
-func NewDefaultSlackHook() LogHook {
-	return &DefaultSlackHook{}
+// NewDefaultJsonFileLogHook creates and returns a new instance of defaultJsonFileLogHook.
+func NewDefaultJsonFileLogHook() LogHook {
+	return &defaultJsonFileLogHook{}
 }
 
-// AddHook
-func (dsh *DefaultSlackHook) AddHook(logLevel Level, args ...any) error {
+// Fire method for defaultJsonFileLogHook writes the provided log entry to a file named "app.log" in JSON format.
+// If the file does not exist, it creates a new one. If it exists, it appends the new log entry to the file.
+func (djf *defaultJsonFileLogHook) Fire(le *LogEntry) error {
+	// Create a new file called app.log if it doesn't exist
+	if _, err := os.Stat("app.log"); os.IsNotExist(err) {
+		file, err := os.Create("app.log")
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+	}
+
+	// Open the file in append mode
+	file, err := os.OpenFile("app.log", os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+
+	JsonEntry := map[string]any{
+		"level": le.logLevel.String(),
+		"time":  le.logTime,
+		"msg":   le.rowMessage,
+		"path":  fmt.Sprintf("%s:%d", le.caller.File, le.caller.Line),
+	}
+
+	jsonData, err := json.Marshal(JsonEntry)
+	if err != nil {
+		return err
+	}
+
+	logMsg := string(jsonData) + "\n"
+	// Write the log message to the file
+	if _, err := file.WriteString(logMsg); err != nil {
+		return err
+	}
+
 	return nil
 }
