@@ -84,6 +84,7 @@ type logger struct {
 	LogHooks     []LogHook
 	Ident        string
 	EntryPool    sync.Pool
+	isCaller     bool // Whether to log caller information
 }
 
 // NewLogger - NewLogger function
@@ -94,7 +95,13 @@ func NewLogger(ident string) Logger {
 		LogFilter:    NewDefaultNoFilter(),
 		LogHooks:     []LogHook{NewDefaultJsonFileLogHook()},
 		Ident:        ident,
+		isCaller:     false,
 	}
+}
+
+// EnableCaller  - enable caller info
+func (l *logger) EnableCaller() {
+	l.isCaller = true
 }
 
 // Log - Log function prints the log message

@@ -2,7 +2,6 @@ package nexlog
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gookit/color"
@@ -25,20 +24,22 @@ func NewDefaultTextFormatter() LogFormatter {
 // The formatted string includes log identifier, colored log level, log time, log message, and the location in the source file of the log call.
 func (dtf *defaultTextFormatter) Format(le *LogEntry) string {
 	fileLoc := fmt.Sprintf("%s:%d", le.caller.File, le.caller.Line)
-	fileLoc = strings.SplitN(fileLoc, "nexlog/", 2)[1]
 	fileLoc = color.FgMagenta.Render(fileLoc)
 
 	logTime := time.Now().Format("2006-01-02 15:04:05")
 	logLvl := le.logLevel.Color()
 
 	logMsg := fmt.Sprintf(
-		"[%s] %s %s | %s %s",
+		"[%s] %s %s | %s",
 		le.logger.Ident,
 		logLvl,
 		logTime,
 		le.logMessage,
-		fileLoc,
 	)
+
+	if le.logger.isCaller {
+		logMsg += fmt.Sprintf(" %s", fileLoc)
+	}
 
 	return logMsg
 }
