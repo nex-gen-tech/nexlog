@@ -88,11 +88,20 @@ type logger struct {
 	EntryPool                sync.Pool
 	isCaller                 bool
 	enableDefaultFileLogHook bool
+	mu                       sync.Mutex
+}
+
+type Config struct {
+	LogLevel       Level
+	LogFormatter   LogFormatter
+	LogFilter      LogFilter
+	EnableCaller   bool
+	EnableFileHook bool
 }
 
 // New - New function
-func New(ident string) Logger {
-	return &logger{
+func New(ident string, config ...Config) Logger {
+	l := logger{
 		LogLevel:                 INF,
 		LogFormatter:             newDefaultTextFormatter(),
 		LogFilter:                newDefaultNoFilter(),
@@ -101,6 +110,41 @@ func New(ident string) Logger {
 		isCaller:                 false,
 		enableDefaultFileLogHook: false,
 	}
+
+	if len(config) > 0 {
+		// Set log level if provided
+		if config[0].LogLevel != 0 {
+			l.LogLevel = config[0].LogLevel
+		}
+		// Set log formatter if provided
+		if config[0].LogFormatter != nil {
+			l.LogFormatter = config[0].LogFormatter
+		}
+		// Set log filter if provided
+		if config[0].LogFilter != nil {
+			l.LogFilter = config[0].LogFilter
+		}
+		// Enable caller if provided
+		if config[0].EnableCaller {
+			l.EnableCaller()
+		}
+		// Enable default file log hook if provided
+		if config[0].EnableFileHook {
+			l.EnableDefaultFileLogHook()
+		}
+		// Add default file log hook if enabled
+		if l.enableDefaultFileLogHook {
+			l.AddHook(newDefaultJsonFileLogHook())
+		}
+	}
+
+	// Add entry pool
+	l.EntryPool.New = func() any {
+		return newEntry(&l, INF)
+	}
+
+	// return logger
+	return &l
 }
 
 // EnableCaller  - enable caller info
@@ -115,6 +159,8 @@ func (l *logger) EnableDefaultFileLogHook() {
 
 // Log - Log function prints the log message
 func (l *logger) Log(logLevel Level, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var entry *LogEntry
 	entry, ok := l.EntryPool.Get().(*LogEntry)
 	if !ok {
@@ -129,6 +175,8 @@ func (l *logger) Log(logLevel Level, args ...any) {
 
 // LogF - LogF function prints the log message with the given format
 func (l *logger) LogF(logLevel Level, format string, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var entry *LogEntry
 	entry, ok := l.EntryPool.Get().(*LogEntry)
 	if !ok {

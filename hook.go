@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 )
 
 // LogHook is an interface that encapsulates actions to be taken after a log entry is created.
@@ -12,7 +13,7 @@ type LogHook interface {
 }
 
 // defaultJsonFileLogHook is an implementation of LogHook that writes log entries to a JSON file.
-type defaultJsonFileLogHook struct{}
+type defaultJsonFileLogHook struct{ mu sync.Mutex }
 
 // newDefaultJsonFileLogHook creates and returns a new instance of defaultJsonFileLogHook.
 func newDefaultJsonFileLogHook() LogHook {
@@ -22,6 +23,8 @@ func newDefaultJsonFileLogHook() LogHook {
 // Fire method for defaultJsonFileLogHook writes the provided log entry to a file named "app.log" in JSON format.
 // If the file does not exist, it creates a new one. If it exists, it appends the new log entry to the file.
 func (djf *defaultJsonFileLogHook) Fire(le *LogEntry) error {
+	djf.mu.Lock()
+	defer djf.mu.Unlock()
 	// Create a new file called app.log if it doesn't exist
 	if _, err := os.Stat("app.log"); os.IsNotExist(err) {
 		file, err := os.Create("app.log")
