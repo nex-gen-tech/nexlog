@@ -9,9 +9,9 @@ type LogFilter interface {
 // defaultNoFilter is a type of LogFilter that does not filter any logs.
 type defaultNoFilter struct{}
 
-// NewDefaultNoFilter creates and returns a new instance of defaultNoFilter.
+// newDefaultNoFilter creates and returns a new instance of defaultNoFilter.
 // This function is useful when no log filtering is required.
-func NewDefaultNoFilter() LogFilter {
+func newDefaultNoFilter() LogFilter {
 	return &defaultNoFilter{}
 }
 

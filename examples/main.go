@@ -3,9 +3,11 @@ package main
 import "github.com/nex-gen-tech/nexlog"
 
 func main() {
-	logger := nexlog.NewLogger("NEXLOG")
+	logger := nexlog.New("NEXLOG")
+	// logger.EnableCaller()
+	// logger.EnableDefaultFileLogHook()
 
-	logger.Log(nexlog.INF, "Hello World")
+	logger.Info("Hello World")
 	logger.LogF(nexlog.INF, "Hello %s", "World")
 	logger.Info("Hello World")
 	logger.InfoF("Hello %s", "World")

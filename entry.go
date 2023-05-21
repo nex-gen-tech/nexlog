@@ -23,8 +23,8 @@ type LogEntry struct {
 	buffer     *bytes.Buffer   // Buffer to hold log message data
 }
 
-// NewEntry creates a new LogEntry with given logger, logLevel and arguments.
-func NewEntry(logger *logger, logLevel Level, args ...any) *LogEntry {
+// newEntry creates a new LogEntry with given logger, logLevel and arguments.
+func newEntry(logger *logger, logLevel Level, args ...any) *LogEntry {
 	logEntry := &LogEntry{
 		logger:    logger,
 		logLevel:  logLevel,
@@ -34,7 +34,6 @@ func NewEntry(logger *logger, logLevel Level, args ...any) *LogEntry {
 		context:   context.Background(),
 		buffer:    &bytes.Buffer{},
 	}
-
 	return logEntry
 }
 
@@ -51,13 +50,27 @@ func (le *LogEntry) LogF(logLevel Level, format string, args ...any) {
 // log is a helper function that logs the provided arguments at the given logLevel.
 func (le *LogEntry) log(logLevel Level, args ...any) {
 	if le.logger.LogFilter.Filter(logLevel, args...) || le.logger.LogLevel <= logLevel {
+		// Set Log Message
 		le.logMessage = fmt.Sprint(args...)
+
+		// Set Row Message
 		le.rowMessage = fmt.Sprint(args...)
+
+		// Set Log Level
 		le.logLevel = logLevel
+
+		// Set Log Message
 		le.logMessage = le.logger.LogFormatter.Format(le)
 
+		// Print Log Message
 		fmt.Println(le.logMessage)
 
+		// if enableDefaultFileLogHook is true, then write log to file
+		if le.logger.enableDefaultFileLogHook {
+			le.logger.LogHooks = append(le.logger.LogHooks, newDefaultJsonFileLogHook())
+		}
+
+		// Fire Log Hooks
 		for _, hook := range le.logger.LogHooks {
 			hook.Fire(le)
 		}

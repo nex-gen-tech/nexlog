@@ -14,8 +14,8 @@ type LogHook interface {
 // defaultJsonFileLogHook is an implementation of LogHook that writes log entries to a JSON file.
 type defaultJsonFileLogHook struct{}
 
-// NewDefaultJsonFileLogHook creates and returns a new instance of defaultJsonFileLogHook.
-func NewDefaultJsonFileLogHook() LogHook {
+// newDefaultJsonFileLogHook creates and returns a new instance of defaultJsonFileLogHook.
+func newDefaultJsonFileLogHook() LogHook {
 	return &defaultJsonFileLogHook{}
 }
 
@@ -41,7 +41,10 @@ func (djf *defaultJsonFileLogHook) Fire(le *LogEntry) error {
 		"level": le.logLevel.String(),
 		"time":  le.logTime,
 		"msg":   le.rowMessage,
-		"path":  fmt.Sprintf("%s:%d", le.caller.File, le.caller.Line),
+	}
+
+	if le.caller != nil {
+		JsonEntry["path"] = fmt.Sprintf("%s:%d", le.caller.File, le.caller.Line)
 	}
 
 	jsonData, err := json.Marshal(JsonEntry)

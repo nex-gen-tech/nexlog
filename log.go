@@ -74,28 +74,32 @@ type Logger interface {
 	SetLogFormatter(logFormatter LogFormatter)
 	SetLogFilter(logFilter LogFilter)
 	AddHook(logHook LogHook)
+	EnableCaller()
+	EnableDefaultFileLogHook()
 }
 
 // logger - logger struct
 type logger struct {
-	LogLevel     Level
-	LogFormatter LogFormatter
-	LogFilter    LogFilter
-	LogHooks     []LogHook
-	Ident        string
-	EntryPool    sync.Pool
-	isCaller     bool // Whether to log caller information
+	LogLevel                 Level
+	LogFormatter             LogFormatter
+	LogFilter                LogFilter
+	LogHooks                 []LogHook
+	Ident                    string
+	EntryPool                sync.Pool
+	isCaller                 bool
+	enableDefaultFileLogHook bool
 }
 
-// NewLogger - NewLogger function
-func NewLogger(ident string) Logger {
+// New - New function
+func New(ident string) Logger {
 	return &logger{
-		LogLevel:     INF,
-		LogFormatter: NewDefaultTextFormatter(),
-		LogFilter:    NewDefaultNoFilter(),
-		LogHooks:     []LogHook{NewDefaultJsonFileLogHook()},
-		Ident:        ident,
-		isCaller:     false,
+		LogLevel:                 INF,
+		LogFormatter:             newDefaultTextFormatter(),
+		LogFilter:                newDefaultNoFilter(),
+		LogHooks:                 []LogHook{},
+		Ident:                    ident,
+		isCaller:                 false,
+		enableDefaultFileLogHook: false,
 	}
 }
 
@@ -104,14 +108,21 @@ func (l *logger) EnableCaller() {
 	l.isCaller = true
 }
 
+// EnableDefaultFileLogHook - enable default file log hook
+func (l *logger) EnableDefaultFileLogHook() {
+	l.enableDefaultFileLogHook = true
+}
+
 // Log - Log function prints the log message
 func (l *logger) Log(logLevel Level, args ...any) {
 	var entry *LogEntry
 	entry, ok := l.EntryPool.Get().(*LogEntry)
 	if !ok {
-		entry = NewEntry(l, logLevel, args...)
+		entry = newEntry(l, logLevel, args...)
 	}
-	entry.caller = getCaller()
+	if l.isCaller {
+		entry.caller = getCaller()
+	}
 	entry.Log(logLevel, args...)
 	l.EntryPool.Put(entry)
 }
@@ -121,9 +132,11 @@ func (l *logger) LogF(logLevel Level, format string, args ...any) {
 	var entry *LogEntry
 	entry, ok := l.EntryPool.Get().(*LogEntry)
 	if !ok {
-		entry = NewEntry(l, logLevel, args...)
+		entry = newEntry(l, logLevel, args...)
 	}
-	entry.caller = getCaller()
+	if l.isCaller {
+		entry.caller = getCaller()
+	}
 	entry.Log(logLevel, fmt.Sprintf(format, args...))
 	l.EntryPool.Put(entry)
 }
